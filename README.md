@@ -7,7 +7,7 @@ _Short Intro_
 ```text
 Since the invention of the first QR Code, it has become ubiquitous in various services.
 The widespread use of QR Code is an undeniable reality. Therefore, I undertook this project
-to delve into the intricacies of the black-and-white pixelated matrix we know as the QR Code.
+to delve into the intricacies behind the black-and-white pixelated matrix we know as the QR Code.
 ```
 
 
