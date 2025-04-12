@@ -32,8 +32,11 @@ the minimum size required (in bits) to store the characters in ```input[n..]``` 
 The path is denoted by a list of ```(pos, mode)``` where `pos` is where the index would change mode from the previous mode into `mode`.
 However, a change is unnecessary, or, in other words, no change of modes may happen.
 Therefore, the path constructed is processed into ```encoding``` as a list of ```(len, mode)``` where `len` is the number of characters using `mode`.
-- Before returning, the final addition of length sizes is added since the process above only adds the mode indicator and the size of the data.
-- `get_version` returns `(size, encoding)` where `size` is the size of the entire data codewords in bits.<br/>
+- Before returning, two things are done:
+  - All characters encoded in bytes are taken and passed into an encoder for `ISO-8859-1` (or in the code, `WINDOWS-1252` since they are equivalent).
+    If the test fails, an ECI header will be added to set the encoding as `UTF-8 (0111 00011010)`
+  - The final addition of length sizes is added since the process above only adds the mode indicator and the size of the data.
+- `get_version` returns `(version, encoding, add_eci_utf8)` where `version` is the version of the QR code and `add_eci_utf8` is the flag to add the `UTF-8 ECI header`.<br/>
 
 `encoding` is then iterated and the data is encoded into the `BitStream`.
 
