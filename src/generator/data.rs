@@ -1,6 +1,6 @@
 use crate::generator::ErrorCorrection;
 
-const MAX_SIZE_DATA: [[u16; 40]; 4] = [
+const MAX_SIZE_DATA: [[usize; 40]; 4] = [
     [
         152, 272, 440, 640, 864, 1088, 1248, 1552, 1856, 2192,
         2592, 2960, 3424, 3688, 4184, 4712, 5176, 5768, 6360, 6888,
@@ -27,7 +27,7 @@ const MAX_SIZE_DATA: [[u16; 40]; 4] = [
     ]
 ];
 
-pub fn qr_version_query(ecc: &ErrorCorrection, size: u16) -> usize {
+pub fn qr_version_query(ecc: &ErrorCorrection, size: usize) -> u8 {
     let idx = match ecc {
         ErrorCorrection::Low => 0,
         ErrorCorrection::Medium => 1,
@@ -53,5 +53,5 @@ pub fn qr_version_query(ecc: &ErrorCorrection, size: u16) -> usize {
         return 41;
     }
     
-    return first + 1;
+    return (first + 1) as u8;
 }

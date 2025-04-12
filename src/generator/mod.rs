@@ -85,38 +85,23 @@ impl Generator {
             _ => panic!("Something went wrong during qr code generation: weird mode {mode}")
         }
     }
-  
-    //     len + match mode {
-    //         0 => if qr_version_query(&self.flag.ecc, len + 12) > 26 { 14 }
-    //             else if qr_version_query(&self.flag.ecc, len + 10) > 9 { 12 }
-    //             else { 10 },
-    //         1 => if qr_version_query(&self.flag.ecc, len + 11) > 26 { 13 }
-    //             else if qr_version_query(&self.flag.ecc, len + 9) > 9 { 11 }
-    //             else { 9 },
-    //         2 => if qr_version_query(&self.flag.ecc, len + 8) > 10 { 16 } else { 8 },
-    //         3 => if qr_version_query(&self.flag.ecc, len + 10) > 26 { 12 }
-    //             else if qr_version_query(&self.flag.ecc, len + 8) > 9 { 10 }
-    //             else { 8 },
-    //         _ => panic!("Something went wrong during qr code generation: weird mode {mode}")
-    //     }
-    // };
 
-    fn get_version(&self) -> usize {
+    fn get_version(&self) -> (u8, Vec<(u16, u8)>) {
         if self.flag.bytes {
             let length = self.text.len();
-            let v1 = qr_version_query(&self.flag.ecc, (length * 8 + 12) as u16); //test for v1-10 by 8 bit char count indicator
-            let v2 = qr_version_query(&self.flag.ecc, (length * 8 + 20) as u16); //test for v11-40 by 16 bit char count indicator
+            let v1 = qr_version_query(&self.flag.ecc, length * 8 + 12); //test for v1-10 by 8 bit char count indicator
+            let v2 = qr_version_query(&self.flag.ecc, length * 8 + 20); //test for v11-40 by 16 bit char count indicator
             
             if v1 == 41 {
                 println!("Error: data is too large to be converted into a QR code. Data length: {length}.");
                 exit(0);
             }
             
-            self.flag.min_vers.max(v1.min(v2) as u8) as usize
+            (self.flag.min_vers.max(v1.min(v2)), Vec::new())
         } else {
             let mut iter = self.text.chars().rev().peekable();
             if let None = iter.peek() {
-                return 0;
+                return (0, Vec::new());
             }
 
             let len = iter.clone().count();
@@ -201,18 +186,32 @@ impl Generator {
                 prev_pos = pos;
             }
             encoding.push((len as u16 - prev_pos, prev_mode));
+            
+            let mut mode_count: Vec<usize> = vec![0, 0, 0, 0];
+            for (_, mode) in &encoding {
+                mode_count[*mode as usize] += 1;
+            }
 
-            println!("\n{min_cost}\n{encoding:?}");
-
-            1
-            // self.flag.min_vers.max(qr_version_query(&self.flag.ecc, size) as u8) as usize
+            let v0 = qr_version_query(&self.flag.ecc, min_cost + mode_count[0] * 14 + mode_count[1] * 13 + mode_count[2] * 16 + mode_count[3] * 12);
+            (self.flag.min_vers.max(
+                if v0 <= 26 {
+                    let v1 = qr_version_query(&self.flag.ecc, min_cost + mode_count[0] * 12 + mode_count[1] * 11 + mode_count[2] * 16 + mode_count[3] * 10);
+                    if v1 <= 9 {
+                        qr_version_query(&self.flag.ecc, min_cost + mode_count[0] * 10 + mode_count[1] * 9 + mode_count[2] * 8 + mode_count[3] * 8)
+                    } else {
+                        v1
+                    }
+                } else {
+                    v0
+                }
+            ) as u8, encoding)
         }
     }
 
     pub fn run(self) {
         let mut stream = BitStream::new();
 
-        let version = self.get_version();
+        let (version, encoding) = self.get_version();
         
         let mut chars = self.text.chars();
 
@@ -221,9 +220,19 @@ impl Generator {
             // println!("\nlength: {}; version: {version}", self.text.len());
             // stream.debug_print();
         } else {
-            // KanjiEncoder::encode(&mut chars, self.text.chars().count(), &mut stream, version);
-            println!("\nlength: {}; version: {version}", self.text.len());
-            // stream.debug_print();
+            println!("{encoding:?}");
+            for (len, mode) in encoding {
+                match mode {
+                    0 => NumeralEncoder::encode(&mut chars, len as usize, &mut stream, version),
+                    1 => AlphanumEncoder::encode(&mut chars, len as usize, &mut stream, version),
+                    2 => BytesEncoder::encode(&mut chars, len as usize, &mut stream, version),
+                    3 => KanjiEncoder::encode(&mut chars, len as usize, &mut stream, version),
+                    _ => panic!("Error occurred during qr code generation parsing: weird mode {mode}")
+                }
+            }
+
+            println!("\nversion: {version}");
+            stream.debug_print();
         }
     }
 }

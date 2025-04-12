@@ -5,7 +5,7 @@ use super::bitstream::BitStream;
 //[mode indicator] [char count indicator] [encoding bytes] [preferred but optional: 4 times 0s terminator]
 pub trait Encoder {
     //returns free bits in the current byte
-    fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: usize);
+    fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: u8);
 }
 
 pub struct NumeralEncoder;
@@ -14,7 +14,7 @@ pub struct BytesEncoder;
 pub struct KanjiEncoder;
 
 impl Encoder for NumeralEncoder {
-    fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: usize) {
+    fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: u8) {
         bytes.push_bits(0b0001, 4);
 
         if version <= 9 {
@@ -53,10 +53,14 @@ impl Encoder for NumeralEncoder {
     }
 }
 
-pub const fn is_kanji(c: char) -> bool {
-    (c >= '\u{4E00}' && c <= '\u{9FAF}') ||
-    (c >= '\u{3400}' && c <= '\u{4DBF}') ||
-    false
+pub fn is_kanji(ch: char) -> bool {
+    let mut buffer = [0; 4];
+    let char_str = ch.encode_utf8(&mut buffer);
+
+    // Encode the char as SHIFT_JIS.  If encoding succeeds without error, it's encodable.
+    let (encoded, _, err) = SHIFT_JIS.encode(&char_str);
+
+    !err && !encoded.is_empty()
 }
 
 pub const fn alphanum_value(c: char) -> Option<u8> {
@@ -111,7 +115,7 @@ pub const fn alphanum_value(c: char) -> Option<u8> {
 }
 
 impl Encoder for AlphanumEncoder {    
-    fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: usize) {
+    fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: u8) {
         bytes.push_bits(0b0010, 4);
 
         if version <= 9 {
@@ -137,31 +141,38 @@ impl Encoder for AlphanumEncoder {
 }
 
 impl Encoder for BytesEncoder {
-    fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: usize) {
+    fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: u8) {
         bytes.push_bits(0b0100, 4);
+
+        let mut str = String::new();
+        for _ in 0..length {
+            str.push(text.next().unwrap());
+        }
+        let len = str.len();
+        let mut str_iter = str.chars();
         
         if version <= 10 {
-            bytes.push(length as u8);
+            bytes.push(len as u8);
         } else {
-            bytes.push((length >> 8) as u8);
-            bytes.push((length & 0xFF) as u8);
+            bytes.push((len >> 8) as u8);
+            bytes.push((len & 0xFF) as u8);
         }
         
         for _ in 0..length {
-            let ch = text.next().unwrap_or('\0');
+            let ch = str_iter.next().unwrap_or('\0');
             let mut text_bytes = [0u8; 4];
             ch.encode_utf8(&mut text_bytes);
-            let val = ((text_bytes[0] as usize) << 24) |
-                            ((text_bytes[1] as usize) << 16) |
-                            ((text_bytes[2] as usize) << 8) |
-                            text_bytes[3] as usize;
+            let val = ((text_bytes[3] as usize) << 24) |
+                            ((text_bytes[2] as usize) << 16) |
+                            ((text_bytes[1] as usize) << 8) |
+                            text_bytes[0] as usize;
             bytes.push_bits_big(val, (ch.len_utf8() * 8) as u8);
         }
     }
 }
 
 impl Encoder for KanjiEncoder {
-    fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: usize) {
+    fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: u8) {
         bytes.push_bits(0b1000, 4);
         
         if version <= 9 {
