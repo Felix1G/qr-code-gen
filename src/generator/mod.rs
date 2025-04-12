@@ -4,6 +4,7 @@ mod bitstream;
 use bitstream::BitStream;
 use data::qr_version_query;
 use encoder::{alphanum_value, is_kanji, AlphanumEncoder, BytesEncoder, Encoder, KanjiEncoder, NumeralEncoder};
+use encoding_rs::{ISO_8859_10, WINDOWS_1252};
 use std::{fs::File, io::Read, process::exit};
 use std::iter::Peekable;
 use std::str::Chars;
@@ -86,7 +87,7 @@ impl Generator {
         }
     }
 
-    fn get_version(&self) -> (u8, Vec<(u16, u8)>) {
+    fn get_version(&self) -> (u8, Vec<(u16, u8)>, bool) {
         if self.flag.bytes {
             let length = self.text.len();
             let v1 = qr_version_query(&self.flag.ecc, length * 8 + 12); //test for v1-10 by 8 bit char count indicator
@@ -97,11 +98,11 @@ impl Generator {
                 exit(0);
             }
             
-            (self.flag.min_vers.max(v1.min(v2)), Vec::new())
+            (self.flag.min_vers.max(v1.min(v2)), Vec::new(), false)
         } else {
             let mut iter = self.text.chars().rev().peekable();
             if let None = iter.peek() {
-                return (0, Vec::new());
+                return (0, Vec::new(), false);
             }
 
             let len = iter.clone().count();
@@ -172,7 +173,7 @@ impl Generator {
                 }
             }
 
-            let min_cost = dp[data[0].0 as usize][data[0].1 as usize] + 4;
+            let mut min_cost = dp[data[0].0 as usize][data[0].1 as usize] + 4;
             let mut encoding = Vec::<(u16, u8)>::new();
             let mut prev_mode = data[0].1;
             let mut prev_pos = data[0].0;
@@ -188,8 +189,19 @@ impl Generator {
             encoding.push((len as u16 - prev_pos, prev_mode));
             
             let mut mode_count: Vec<usize> = vec![0, 0, 0, 0];
-            for (_, mode) in &encoding {
+            let mut chars_using_byte = String::new();
+            let mut text_iter = self.text.chars();
+            for (len, mode) in &encoding {
                 mode_count[*mode as usize] += 1;
+                for _ in 0..*len {
+                    if *mode == 2 {
+                        chars_using_byte.push(text_iter.next().unwrap());
+                    }
+                }
+            }
+            let (_, _, add_eci_utf8) = WINDOWS_1252.encode(chars_using_byte.as_str());
+            if add_eci_utf8 {
+                min_cost += 12; //eci header
             }
 
             let v0 = qr_version_query(&self.flag.ecc, min_cost + mode_count[0] * 14 + mode_count[1] * 13 + mode_count[2] * 16 + mode_count[3] * 12);
@@ -204,23 +216,30 @@ impl Generator {
                 } else {
                     v0
                 }
-            ) as u8, encoding)
+            ) as u8, encoding, add_eci_utf8)
         }
     }
 
     pub fn run(self) {
         let mut stream = BitStream::new();
 
-        let (version, encoding) = self.get_version();
+        let (version, encoding, add_eci_utf8) = self.get_version();
+        if version == 0 || version > 40 {
+            panic!("Error: {}.", if version > 40 { "number of characters cannot fit a QR code." } else { "no characters found." })
+        }
         
         let mut chars = self.text.chars();
 
         if self.flag.bytes {
-            BytesEncoder::encode(&mut chars, self.text.len(), &mut stream, version);
+            BytesEncoder::encode(&mut chars, self.text.chars().count(), &mut stream, version);
             // println!("\nlength: {}; version: {version}", self.text.len());
             // stream.debug_print();
         } else {
-            println!("{encoding:?}");
+            // println!("{encoding:?}");
+            if add_eci_utf8 {
+                stream.push_bits_big(0b011100011010usize, 12);
+            }
+
             for (len, mode) in encoding {
                 match mode {
                     0 => NumeralEncoder::encode(&mut chars, len as usize, &mut stream, version),
@@ -231,8 +250,8 @@ impl Generator {
                 }
             }
 
-            println!("\nversion: {version}");
-            stream.debug_print();
+            // println!("\nversion: {version}");
+            // stream.debug_print();
         }
     }
 }

@@ -144,6 +144,8 @@ impl Encoder for BytesEncoder {
     fn encode(text: &mut std::str::Chars, length: usize, bytes: &mut BitStream, version: u8) {
         bytes.push_bits(0b0100, 4);
 
+        //TODO: divide byte into the eci headers
+
         let mut str = String::new();
         for _ in 0..length {
             str.push(text.next().unwrap());

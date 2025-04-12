@@ -8,7 +8,7 @@ fn usage_str() -> String {
 Usage: qr-gen [OPTIONS (optional)] <text OR data file path> [generated-image-path (default: qr_code.png)] [pixel size (default: 5)]
 Options:
     -f: data file path is provided | (default is false)
-    -b: convert data to bytes | (default is false)
+    -b: convert data to bytes, encoding types (eci headers) will not be considered | (default is false)
     -v[number]: minimum version of QR code being version 'number' from 1 to 40. (eg: -v3) | (default is 1)
     -e[number]: error correction, takes up about ~x% space. 0 = low (~7%), 1 = medium (~15%), 2 = quartile (~25%), 3 = high (~30%) | (default is quartile)
 ")
