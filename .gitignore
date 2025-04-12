@@ -1,8 +1,8 @@
 /target
+.idx/
+.vscode/
 hello.txt
 me.txt
 you.txt
 push.sh
-.vscode
-.idx
 .gitignore
