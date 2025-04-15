@@ -1,4 +1,4 @@
-use crate::generator::ErrorCorrection;
+use crate::generator::ECCLevel;
 
 const MAX_SIZE_DATA: [[usize; 40]; 4] = [
     [
@@ -27,12 +27,12 @@ const MAX_SIZE_DATA: [[usize; 40]; 4] = [
     ]
 ];
 
-pub fn qr_version_query(ecc: &ErrorCorrection, size: usize) -> u8 {
+pub fn qr_version_query(ecc: &ECCLevel, size: usize) -> u8 {
     let idx = match ecc {
-        ErrorCorrection::Low => 0,
-        ErrorCorrection::Medium => 1,
-        ErrorCorrection::Quartile => 2,
-        ErrorCorrection::High => 3
+        ECCLevel::Low => 0,
+        ECCLevel::Medium => 1,
+        ECCLevel::Quartile => 2,
+        ECCLevel::High => 3
     };
 
     let mut first = 0;

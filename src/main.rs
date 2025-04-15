@@ -1,7 +1,7 @@
 mod generator;
 use std::process::exit;
 
-use generator::{ErrorCorrection, Flag, Generator};
+use generator::{ECCLevel, Flag, Generator};
 
 fn usage_str() -> String {
 	String::from("
@@ -51,11 +51,11 @@ fn set_options(op: &String, flag: &mut Flag) {
                     Ok(x) => {
                         if x <= 3 {
                             flag.ecc = match x {
-                                0 => ErrorCorrection::Low,
-                                1 => ErrorCorrection::Medium,
-                                2 => ErrorCorrection::Quartile,
-                                3 => ErrorCorrection::High,
-                                _ => ErrorCorrection::Quartile
+                                0 => ECCLevel::Low,
+                                1 => ECCLevel::Medium,
+                                2 => ECCLevel::Quartile,
+                                3 => ECCLevel::High,
+                                _ => ECCLevel::Quartile
                             }
                         } else {
                             println!("Error: use -h to see how to use the '-e' flag.");

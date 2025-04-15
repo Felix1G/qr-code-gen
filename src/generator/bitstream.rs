@@ -85,6 +85,12 @@ impl BitStream {
         }
     }
 
+    pub fn consume(self) -> (Vec<u8>, usize) {
+        let sub_size = if self.offset == 0 { 0 } else { 8 - self.offset } as usize;
+        let size = 8 * self.bytes.len() - sub_size;
+        (self.bytes, size)
+    }
+
     #[allow(dead_code)]
     pub fn debug_print(&self) {
         for num in &self.bytes {

@@ -1,16 +1,16 @@
 mod data;
 mod encoder;
 mod bitstream;
+mod ecc;
 use bitstream::BitStream;
 use data::qr_version_query;
+use ecc::ErrorCorrection;
 use encoder::{alphanum_value, is_kanji, AlphanumEncoder, BytesEncoder, Encoder, KanjiEncoder, NumeralEncoder};
-use encoding_rs::{ISO_8859_10, WINDOWS_1252};
+use encoding_rs::WINDOWS_1252;
 use std::{fs::File, io::Read, process::exit};
-use std::iter::Peekable;
-use std::str::Chars;
 
 #[derive(Debug)]
-pub enum ErrorCorrection {
+pub enum ECCLevel {
     Low,
     Medium,
     Quartile,
@@ -22,7 +22,7 @@ pub struct Flag {
     pub data: bool,
     pub bytes: bool,
     pub min_vers: u8,
-    pub ecc: ErrorCorrection
+    pub ecc: ECCLevel
 }
 
 impl Flag {
@@ -31,7 +31,7 @@ impl Flag {
             data: false,
             bytes: false,
             min_vers: 1,
-            ecc: ErrorCorrection::Quartile
+            ecc: ECCLevel::Quartile
         }
     }
 }
@@ -92,11 +92,6 @@ impl Generator {
             let length = self.text.len();
             let v1 = qr_version_query(&self.flag.ecc, length * 8 + 12); //test for v1-10 by 8 bit char count indicator
             let v2 = qr_version_query(&self.flag.ecc, length * 8 + 20); //test for v11-40 by 16 bit char count indicator
-            
-            if v1 == 41 {
-                println!("Error: data is too large to be converted into a QR code. Data length: {length}.");
-                exit(0);
-            }
             
             (self.flag.min_vers.max(v1.min(v2)), Vec::new(), false)
         } else {
@@ -203,7 +198,7 @@ impl Generator {
             if add_eci_utf8 {
                 min_cost += 12; //eci header
             }
-
+            
             let v0 = qr_version_query(&self.flag.ecc, min_cost + mode_count[0] * 14 + mode_count[1] * 13 + mode_count[2] * 16 + mode_count[3] * 12);
             (self.flag.min_vers.max(
                 if v0 <= 26 {
@@ -221,11 +216,19 @@ impl Generator {
     }
 
     pub fn run(self) {
+        if self.text.chars().count() > 7100 { //should be 7089, but 7100 just for safety
+            panic!("Error: number of characters cannot fit a QR code.")
+        }
+
         let mut stream = BitStream::new();
 
         let (version, encoding, add_eci_utf8) = self.get_version();
         if version == 0 || version > 40 {
-            panic!("Error: {}.", if version > 40 { "number of characters cannot fit a QR code." } else { "no characters found." })
+            panic!("Error: {}", if version > 40 {
+                "number of characters cannot fit a QR code. Consider choosing a lower error correction level."
+            } else {
+                "no characters found."
+            })
         }
         
         let mut chars = self.text.chars();
@@ -235,7 +238,6 @@ impl Generator {
             // println!("\nlength: {}; version: {version}", self.text.len());
             // stream.debug_print();
         } else {
-            // println!("{encoding:?}");
             if add_eci_utf8 {
                 stream.push_bits_big(0b011100011010usize, 12);
             }
@@ -253,5 +255,18 @@ impl Generator {
             // println!("\nversion: {version}");
             // stream.debug_print();
         }
+
+        let (data, size) = stream.consume();
+        for byte in data {
+            print!("{byte:02X} ");
+        }
+        println!("\nlength: {size} = 8 x {} + {}; version: {version}", size / 8, size % 8);
+
+        //error correction
+        let error_correction = ErrorCorrection::new();
+        let data = vec![156, 78, 23, 58, 3, 125, 95, 79, 59, 12, 12, 33];
+        let err = error_correction.calculate(&data, 10);
+        println!("{:?}", err);
+        //assert!(*err_bytes == vec![48u8, 58, 230, 5, 238, 95, 9, 30, 143, 244, 243, 249, 164, 167, 90], "ECC DOES NOT MATCH!");
     }
 }
