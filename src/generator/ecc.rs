@@ -94,8 +94,8 @@ impl ErrorCorrection {
         }
     }
 
-    pub fn calculate(&self, bytes: &Vec<u8>, err_len: usize) -> Vec<u8> {
-        let gen = generate_generator_poly(&self.gf, err_len);
+    pub fn calculate(&self, bytes: &Vec<u8>, err_len: usize, poly: usize) -> Vec<u8> {
+        let gen = generate_generator_poly(&self.gf, poly);
         let mut data = bytes.clone();
         data.resize(bytes.len() + err_len, 0);
         

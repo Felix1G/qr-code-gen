@@ -262,11 +262,7 @@ impl Generator {
         }
         println!("\nlength: {size} = 8 x {} + {}; version: {version}", size / 8, size % 8);
 
-        //error correction
-        let error_correction = ErrorCorrection::new();
-        let data = vec![156, 78, 23, 58, 3, 125, 95, 79, 59, 12, 12, 33];
-        let err = error_correction.calculate(&data, 10);
-        println!("{:?}", err);
-        //assert!(*err_bytes == vec![48u8, 58, 230, 5, 238, 95, 9, 30, 143, 244, 243, 249, 164, 167, 90], "ECC DOES NOT MATCH!");
+        let err = ErrorCorrection::new();
+        println!("{:?}", err.calculate(&vec![80, 12, 3, 123, 33, 94, 20, 35], 15, 10));
     }
 }
