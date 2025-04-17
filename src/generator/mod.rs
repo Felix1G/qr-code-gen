@@ -3,7 +3,7 @@ mod encoder;
 mod bitstream;
 mod ecc;
 use bitstream::BitStream;
-use data::qr_version_query;
+use data::{qr_version_query, BlockDivision};
 use ecc::ErrorCorrection;
 use encoder::{alphanum_value, is_kanji, AlphanumEncoder, BytesEncoder, Encoder, KanjiEncoder, NumeralEncoder};
 use encoding_rs::WINDOWS_1252;
@@ -256,13 +256,18 @@ impl Generator {
             // stream.debug_print();
         }
 
-        let (data, size) = stream.consume();
-        for byte in data {
-            print!("{byte:02X} ");
-        }
-        println!("\nlength: {size} = 8 x {} + {}; version: {version}", size / 8, size % 8);
+        // let (data, size) = stream.consume();
+        // for byte in data {
+        //     print!("{byte:02X} ");
+        // }
+        // println!("\nlength: {size} = 8 x {} + {}; version: {version}", size / 8, size % 8);
+
+        
+        let (mut blocks, mut blocks_num) = BlockDivision::new().consume(version, self.flag.ecc);
+        blocks.reverse();
+        blocks_num.reverse();
 
         let err = ErrorCorrection::new();
-        println!("{:?}", err.calculate(&vec![80, 12, 3, 123, 33, 94, 20, 35], 15, 10));
+        println!("{:?}", err.calculate(&vec![80, 12, 3, 123, 33, 94, 20, 35], 15, 15));
     }
 }
