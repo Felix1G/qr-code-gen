@@ -32,6 +32,7 @@ pub struct BlockDivision {
     n1: [Vec<usize>; 40],
     n2: [Vec<usize>; 40],
     n3: [Vec<usize>; 40],
+    //the third variable is unused for now as it signifies the 'error correction capacity', which is purely informational
     ecc0: [Vec<(usize, usize, usize)>; 40],
     ecc1: [Vec<(usize, usize, usize)>; 40],
     ecc2: [Vec<(usize, usize, usize)>; 40],
@@ -125,7 +126,7 @@ impl BlockDivision {
     }
 
     pub fn consume(self, version: u8, ecc: ECCLevel) -> (Vec<(usize, usize, usize)>, Vec<usize>) {
-        let version = version as usize;
+        let version = (version - 1) as usize;
         (
             match ecc {
                 ECCLevel::Low => self.ecc0[version].clone(),

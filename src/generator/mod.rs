@@ -215,6 +215,34 @@ impl Generator {
         }
     }
 
+    fn combine_data_err(data: Vec<(usize, Vec<u8>)>, err: Vec<Vec<u8>>) -> Vec<u8> {
+        let mut res = Vec::new();
+
+        let mut max_len = data.last().unwrap().1.len();
+        let mut idx = 0;
+        while idx < max_len {
+            for (_, code) in &data {
+                if idx < code.len() {
+                    res.push(code[idx]);
+                }
+            }
+            idx += 1;
+        }
+
+        max_len = err.last().unwrap().len();
+        idx = 0;
+        while idx < max_len {
+            for code in &err {
+                if idx < code.len() {
+                    res.push(code[idx]);
+                }
+            }
+            idx += 1;
+        }
+
+        res
+    }
+
     pub fn run(self) {
         if self.text.chars().count() > 7100 { //should be 7089, but 7100 just for safety
             panic!("Error: number of characters cannot fit a QR code.")
@@ -262,12 +290,67 @@ impl Generator {
         // }
         // println!("\nlength: {size} = 8 x {} + {}; version: {version}", size / 8, size % 8);
 
-        
+        //obtain the data blocks
         let (mut blocks, mut blocks_num) = BlockDivision::new().consume(version, self.flag.ecc);
         blocks.reverse();
         blocks_num.reverse();
+        let (data, _) = stream.consume();
+        let data_size = data.len();
+        let mut idx = 0;
+        let mut data_codewords = Vec::new();
+        while !blocks.is_empty() {
+            let last_idx = blocks_num.last_mut().unwrap();
+            *last_idx -= 1;
+            
+            if idx < data_size {
+                let (total_len, data_len, _) = *blocks.last().unwrap();
+                let mut data_vec = Vec::new();
+                let old_idx = idx;
+                while idx < data_size && idx - old_idx < data_len {
+                    data_vec.push(data[idx]);
+                    idx += 1;
+                }
 
+                while data_vec.len() + 2 < data_len {
+                    data_vec.push(0xEC);
+                    data_vec.push(0x11);
+                }
+
+                if data_vec.len() + 2 != data_len {
+                    data_vec.push(0xEC);
+                }
+
+                data_codewords.push((total_len - data_len, data_vec));
+            } else {
+                let (total_len, data_len, _) = *blocks.last().unwrap();
+                let mut data_vec = Vec::new();
+                
+                while data_vec.len() + 2 < data_len {
+                    data_vec.push(0xEC);
+                    data_vec.push(0x11);
+                }
+
+                if data_vec.len() + 2 != data_len {
+                    data_vec.push(0xEC);
+                }
+
+                data_codewords.push((total_len - data_len, data_vec));
+            }
+
+            if *last_idx == 0 {
+                blocks.pop();
+                blocks_num.pop();
+            }
+        }
+
+        //obtain the error correction blocks
         let err = ErrorCorrection::new();
-        println!("{:?}", err.calculate(&vec![80, 12, 3, 123, 33, 94, 20, 35], 15, 15));
+        let mut error_codewords = Vec::new();
+        for (err_len, code_vec) in &data_codewords {
+            error_codewords.push(err.calculate(code_vec, *err_len, *err_len));
+        }
+
+        let qr_code_data = Self::combine_data_err(data_codewords, error_codewords);
+    
     }
 }
