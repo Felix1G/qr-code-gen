@@ -22,6 +22,8 @@ pub fn run(self) {...}
 ```
 The function above runs the ```Generator```.
 
+---
+<h3>Encoding</h3>
 
 Since the QR code has 40 different versions, the input is fed into the ```get_version``` function
 to find the minimum version required.<br/>
@@ -40,4 +42,28 @@ Therefore, the path constructed is processed into ```encoding``` as a list of ``
 
 `encoding` is then iterated and the data is encoded into the `BitStream`.
 
-To be continued: error handling using Reed-Solomon codes and generating the QR code.
+---
+<h3>Error Correction</h3>
+
+The QR Code uses Reed-Solomon error correction.<br/>
+Firstly, the data block information is obtained from `BlockDivision` in this format:<br/>
+&nbsp; `(b, n)`<br/>
+Where:
+- `b` is the blocks in this format `(total codewords, data codewords, error capacity)`.<br/>
+  To obtain the error codewords in this block: `total codewords - data codewords`
+- `n` denotes the number of times each block is repeated.<br/>
+  ex: (5, 3) denotes that `block 1` repeats 5 times. It is then followed by `block 2` which repeats 3 times.
+
+
+Then, the data from `BitStream` is divided into the respective data blocks. If the amount of data codewords does not reach the maximum for the specific version and error correction level of the QR Code, `0xEC` and `0x11` are alternately padded at the end.
+
+Afterwards, each data block is passed into the error correction engine. I will not go into the mathematics behind the error correction here.
+
+The final data blocks and error code blocks are then interleaved in this manner:<br/>
+$D_{1_{1}}D_{2_{1}}D_{3_{1}}D_{1_{2}}D_{2_{2}}D_{3_{2}}...D_{3_{10}}D_{2_{11}}D_{3_{11}}E_{1_{1}}E_{2_{1}}E_{3_{1}}...$<br/>
+$where\text{ }N_{i_{j}}\text{ }i\text{ is the data/error block }i\text{ and j is the }jth\text{ element in data/error block }i$<br/>
+This sample also showcases how data blocks of different sizes are handled—namely $D_{2}\text{ and }D_{3}\text{ are both larger than }D_{1}$
+
+---
+<h3>Generating the QR Code</h3>
+To be continued: generating the QR code.
