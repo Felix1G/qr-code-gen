@@ -2,6 +2,7 @@ mod bitstream;
 mod data;
 mod ecc;
 mod encoder;
+mod qr;
 use bitstream::BitStream;
 use data::{qr_version_query, BlockDivision};
 use ecc::ErrorCorrection;
@@ -9,6 +10,7 @@ use encoder::{
     alphanum_value, is_kanji, AlphanumEncoder, BytesEncoder, Encoder, KanjiEncoder, NumeralEncoder,
 };
 use encoding_rs::WINDOWS_1252;
+use qr::QRCode;
 use std::{fs::File, io::Read, process::exit};
 
 #[derive(Debug)]
@@ -391,5 +393,7 @@ impl Generator {
         }
 
         let qr_code_data = Self::combine_data_err(data_codewords, error_codewords);
+        let qr_code = QRCode::new(qr_code_data, version);
+        qr_code.gen_image(self.size).save(self.output).unwrap();
     }
 }

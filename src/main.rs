@@ -117,6 +117,10 @@ fn main() {
                 5
             };
 
+            if !(path.ends_with(".png") || path.ends_with(".jpg") || path.ends_with(".jpeg")) {
+                panic!("Error: unsupported file extension for output path. ({})", path);
+            }
+
             //println!("{} {} {} {} {} {}", text, path, size, flag.data, flag.bytes, flag.min_vers);
 
             let gen = Generator::new(text, path, size, flag);

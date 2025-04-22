@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 encoding_rs = "0.8"
+image = { version = "0.25.6", default-features = false, features = ["png", "jpeg"] }
+rand = "0.9.1"
