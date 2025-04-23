@@ -254,7 +254,11 @@ impl Generator {
     fn combine_data_err(data: Vec<(usize, Vec<u8>)>, err: Vec<Vec<u8>>) -> Vec<u8> {
         let mut res = Vec::new();
 
-        let mut max_len = data.last().unwrap().1.len();
+        let mut max_len = 0;
+        for (_, vec) in &data {
+            max_len = max_len.max(vec.len());
+        }
+
         let mut idx = 0;
         while idx < max_len {
             for (_, code) in &data {
@@ -265,7 +269,11 @@ impl Generator {
             idx += 1;
         }
 
-        max_len = err.last().unwrap().len();
+        max_len = 0;
+        for vec in &err {
+            max_len = max_len.max(vec.len());
+        }
+
         idx = 0;
         while idx < max_len {
             for code in &err {
@@ -326,17 +334,12 @@ impl Generator {
             // stream.debug_print();
         }
 
-        // let (data, size) = stream.consume();
-        // for byte in data {
-        //     print!("{byte:02X} ");
-        // }
-        // println!("\nlength: {size} = 8 x {} + {}; version: {version}", size / 8, size % 8);
-
         //obtain the data blocks
-        let (mut blocks, mut blocks_num) = BlockDivision::new().consume(version, self.flag.ecc);
+        let (mut blocks, mut blocks_num) = BlockDivision::new().consume(version, &self.flag.ecc);
         blocks.reverse();
         blocks_num.reverse();
         let (data, _) = stream.consume();
+        
         let data_size = data.len();
         let mut idx = 0;
         let mut data_codewords = Vec::new();
@@ -353,26 +356,28 @@ impl Generator {
                     idx += 1;
                 }
 
-                while data_vec.len() + 2 < data_len {
-                    data_vec.push(0xEC);
-                    data_vec.push(0x11);
-                }
+                if data_vec.len() < data_len {
+                    while data_vec.len() + 2 <= data_len {
+                        data_vec.push(0xEC);
+                        data_vec.push(0x11);
+                    }
 
-                if data_vec.len() + 2 != data_len {
-                    data_vec.push(0xEC);
+                    if data_vec.len() < data_len && data_vec.len() + 2 != data_len {
+                        data_vec.push(0xEC);
+                    }
                 }
 
                 data_codewords.push((total_len - data_len, data_vec));
             } else {
                 let (total_len, data_len, _) = *blocks.last().unwrap();
                 let mut data_vec = Vec::new();
-
-                while data_vec.len() + 2 < data_len {
+                
+                while data_vec.len() + 2 <= data_len {
                     data_vec.push(0xEC);
                     data_vec.push(0x11);
                 }
 
-                if data_vec.len() + 2 != data_len {
+                if data_vec.len() < data_len && data_vec.len() + 2 != data_len {
                     data_vec.push(0xEC);
                 }
 
@@ -389,11 +394,14 @@ impl Generator {
         let err = ErrorCorrection::new();
         let mut error_codewords = Vec::new();
         for (err_len, code_vec) in &data_codewords {
-            error_codewords.push(err.calculate(code_vec, *err_len, *err_len));
+            error_codewords.push(err.calculate(code_vec, *err_len));
         }
-
+        
         let qr_code_data = Self::combine_data_err(data_codewords, error_codewords);
-        let qr_code = QRCode::new(qr_code_data, version);
-        qr_code.gen_image(self.size).save(self.output).unwrap();
+        // println!("{}", qr_code_data.len());
+        let qr_code = QRCode::new(qr_code_data, version, &self.flag.ecc);
+        qr_code.gen_image(self.size).save(&self.output).unwrap();
+
+        println!("QR Code generated as '{}'. (version: {version})", self.output);
     }
 }
