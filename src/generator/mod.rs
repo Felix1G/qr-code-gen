@@ -99,17 +99,17 @@ impl Generator {
         }
     }
 
-    fn get_version(&self) -> (u8, Vec<(u16, u8)>, bool) {
+    fn get_version(&self) -> (u8, Vec<(u16, u8)>) {
         if self.flag.bytes {
             let length = self.text.len();
             let v1 = qr_version_query(&self.flag.ecc, length * 8 + 12); //test for v1-10 by 8 bit char count indicator
             let v2 = qr_version_query(&self.flag.ecc, length * 8 + 20); //test for v11-40 by 16 bit char count indicator
 
-            (self.flag.min_vers.max(v1.min(v2)), Vec::new(), false)
+            (self.flag.min_vers.max(v1.min(v2)), Vec::new())
         } else {
             let mut iter = self.text.chars().rev().peekable();
             if let None = iter.peek() {
-                return (0, Vec::new(), false);
+                return (0, Vec::new());
             }
 
             let len = iter.clone().count();
@@ -207,11 +207,7 @@ impl Generator {
                     }
                 }
             }
-            let (_, _, add_eci_utf8) = WINDOWS_1252.encode(chars_using_byte.as_str());
-            if add_eci_utf8 {
-                min_cost += 12; //eci header
-            }
-
+            
             let v0 = qr_version_query(
                 &self.flag.ecc,
                 min_cost
@@ -245,8 +241,7 @@ impl Generator {
                 } else {
                     v0
                 }) as u8,
-                encoding,
-                add_eci_utf8,
+                encoding
             )
         }
     }
@@ -295,7 +290,7 @@ impl Generator {
 
         let mut stream = BitStream::new();
 
-        let (version, encoding, add_eci_utf8) = self.get_version();
+        let (version, encoding) = self.get_version();
         if version == 0 || version > 40 {
             panic!(
                 "Error: {}",
@@ -314,10 +309,6 @@ impl Generator {
         // println!("\nlength: {}; version: {version}", self.text.len());
         // stream.debug_print();
         } else {
-            if add_eci_utf8 {
-                stream.push_bits_big(0b011100011010usize, 12);
-            }
-
             for (len, mode) in encoding {
                 match mode {
                     0 => NumeralEncoder::encode(&mut chars, len as usize, &mut stream, version),

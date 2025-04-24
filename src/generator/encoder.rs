@@ -165,11 +165,10 @@ impl Encoder for BytesEncoder {
             let ch = str_iter.next().unwrap_or('\0');
             let mut text_bytes = [0u8; 4];
             ch.encode_utf8(&mut text_bytes);
-            let val = ((text_bytes[3] as usize) << 24)
-                | ((text_bytes[2] as usize) << 16)
-                | ((text_bytes[1] as usize) << 8)
-                | text_bytes[0] as usize;
-            bytes.push_bits_big(val, (ch.len_utf8() * 8) as u8);
+            
+            for idx in 0..ch.len_utf8() {
+                bytes.push(text_bytes[idx]);
+            }
         }
     }
 }
