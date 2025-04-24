@@ -9,7 +9,6 @@ use ecc::ErrorCorrection;
 use encoder::{
     alphanum_value, is_kanji, AlphanumEncoder, BytesEncoder, Encoder, KanjiEncoder, NumeralEncoder,
 };
-use encoding_rs::WINDOWS_1252;
 use qr::QRCode;
 use std::{fs::File, io::Read, process::exit};
 
@@ -181,7 +180,7 @@ impl Generator {
                 }
             }
 
-            let mut min_cost = dp[data[0].0 as usize][data[0].1 as usize] + 4;
+            let min_cost = dp[data[0].0 as usize][data[0].1 as usize] + 4;
             let mut encoding = Vec::<(u16, u8)>::new();
             let mut prev_mode = data[0].1;
             let mut prev_pos = data[0].0;
