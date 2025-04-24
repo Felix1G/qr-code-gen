@@ -142,5 +142,9 @@ Similarly, look at `qr.rs` to know how the version information is laid out and `
 Final Thoughts
 
 ```
-I think the QR code is a great example of just how subtle powerful innovation can be, through everyday use. Behind its familiar design is a sophisticated interplay of computing and mathematics, particularly in its use of error correction to ensure its reliability. Its complexity is often overlooked, perhaps because it works so seamlessly. Yet, taking a moment to understand its inner workings reveals not just a technical feat, but a quiet testament to human ingenuity. And I think that's truly wonderful.
+I think the QR code is a great example of just how subtle powerful innovation can be, through everyday use.
+Behind its familiar design is a sophisticated interplay of computing and mathematics, particularly in its
+use of error correction to ensure its reliability. Its complexity is often overlooked, perhaps because it
+works so seamlessly. Yet, taking a moment to understand its inner workings reveals not just a technical feat,
+but a quiet testament to human ingenuity. And I think that's truly wonderful.
 ```
