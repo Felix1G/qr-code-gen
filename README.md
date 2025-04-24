@@ -3,7 +3,7 @@ Felix's QR Code generator
 use the -h flag for help
 
 
-_Short Intro_
+_Short Introduction_
 ```text
 Since the invention of the first QR Code, it has become ubiquitous in various services.
 The widespread use of QR Code is an undeniable reality. Therefore, I undertook this project
@@ -112,8 +112,8 @@ Afterwards, the qr code is masked using 8 mask patterns given by:
 Given by these rules:
 | Rule | Description                                                                 | Penalty |
 |------|-----------------------------------------------------------------------------|---------|
-| 1    | Too many adjacent modules in the same color (more than 5 in a row or column) | 5 - i where i is the number of adjacent modules |
-| 2    | Blocks of the same color in 2×2 areas                                        | 3 * i where i is the number of said 2x2 blocks |
+| 1    | Too many adjacent modules in the same colour (more than 5 in a row or column) | 5 - i where i is the number of adjacent modules |
+| 2    | Blocks of the same colour in 2×2 areas                                        | 3 * i where i is the number of said 2x2 blocks |
 | 3    | Patterns that match the finder pattern (like 1:1:3:1:1 ratios)              | 40 * i where i is the number of said patterns |
 | 4    | Uneven distribution of dark and light modules (should be close to 50%)      | Let % of light modules be i. The penalty is $10\times2\times floor(\frac{50-i}{5})$ |
 
