@@ -66,4 +66,81 @@ This sample also showcases how data blocks of different sizes are handled—name
 
 ---
 <h3>Generating the QR Code</h3>
-To be continued: generating the QR code.
+
+This is done in the `QRCode` class.<br/>
+Firstly, the matrix is created and the following are added: the finder pattern, the timing pattern, and the alignment pattern.
+<br/><br/>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/0b58ef94-54d7-4553-ac31-20de1b371f20" width="200" alt="image showing patterns."><br/>
+  Link to <a href="https://www.researchgate.net/figure/QR-codes-structure-1-Finder-Pattern-It-is-detecting-position-of-QR-code-structure-is_fig2_295584462">credits</a>
+</p>
+<br/><br/>
+The function `is_occupied` in the `QRCode` class returns true if cell `(x, y)` is on any of the patterns above, including the area for version information and format information.
+
+#
+The next step is to copy the data on the QR Code matrix. This is done in a single while loop. The pattern is given as follows:
+<br/><br/>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/8ce62f87-0f2b-48fe-8dd6-335349e2fc48" width="300" alt="image showing data matrix pattern."><br/>
+</p>
+   
+  Look at the code in `qr.rs` to see how the pattern above is programmed.
+</p>
+
+#
+
+Afterwards, the qr code is masked using 8 mask patterns given by:
+
+<div align="center">
+  
+  | Mask Pattern | Formula                        |
+  |--------------|--------------------------------|
+  | 0            | (row + column) % 2 == 0        |
+  | 1            | row % 2 == 0                   |
+  | 2            | column % 3 == 0                |
+  | 3            | (row + column) % 3 == 0        |
+  | 4            | (floor(row / 2) + floor(column / 3)) % 2 == 0 |
+  | 5            | (row * column) % 2 + (row * column) % 3 == 0 |
+  | 6            | ((row * column) % 2 + (row * column) % 3) % 2 == 0 |
+  | 7            | ((row + column) % 2 + (row * column) % 3) % 2 == 0 |
+
+</div>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/03d51373-2cbf-4b7f-9b3d-1392825efbc2" width="300" alt="image showing masking and format info."><br/>
+</p>
+
+Given by these rules:
+| Rule | Description                                                                 | Penalty |
+|------|-----------------------------------------------------------------------------|---------|
+| 1    | Too many adjacent modules in the same color (more than 5 in a row or column) | 5 - i where i is the number of adjacent modules |
+| 2    | Blocks of the same color in 2×2 areas                                        | 3 * i where i is the number of said 2x2 blocks |
+| 3    | Patterns that match the finder pattern (like 1:1:3:1:1 ratios)              | 40 * i where i is the number of said patterns |
+| 4    | Uneven distribution of dark and light modules (should be close to 50%)      | Let % of light modules be i. The penalty is $10\times2\times floor(\frac{50-i}{5})$ |
+
+The mask with the least penalty is chosen as the final QR Code.<br/>
+The format information is subsequently added in this format:
+- 2 bits: Error Correction Level (L=01, M=00, Q=11, H=10)
+- 3 bits: Mask Pattern (0–7)
+- 10 bits: BCH error correction (which is given as a constant table in `data.rs`)
+  → All 15 bits XORed with 101010000010010
+  
+Look at `qr.rs` for the information on how the format information is laid out.
+
+#
+Version Information is only used for QR codes with versions larger or equal to 7.
+- 6 bits: Version number
+- 12 bits: BCH error correction<br/>
+  → All 18 bits encode the version and are placed in fixed areas of the matrix
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/4b07a557-122f-4d91-9b57-443666f4c743" width="300" alt="image showing masking and format info."><br/>
+</p>
+
+Similarly, look at `qr.rs` to know how the version information is laid out and `ecc.rs` for the math behind the BCH error correction codes.
+
+---
+Final Thoughts
+
+```
+I think the QR code is a great example of just how subtle powerful innovation can be, through everyday use. Behind its familiar design is a sophisticated interplay of computing and mathematics, particularly in its use of error correction to ensure its reliability. Its complexity is often overlooked, perhaps because it works so seamlessly. Yet, taking a moment to understand its inner workings reveals not just a technical feat, but a quiet testament to human ingenuity. And I think that's truly wonderful.
+```
