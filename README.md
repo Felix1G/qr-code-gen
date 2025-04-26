@@ -1,13 +1,13 @@
-Felix's QR Code generator
+Felix's QR Code Generator
 ---
 use the -h flag for help
 
 
 _Short Introduction_
 ```text
-Since the invention of the first QR Code, it has become ubiquitous in various services.
-The widespread use of QR Code is an undeniable reality. Therefore, I undertook this project
-to delve into the intricacies behind the black-and-white pixelated matrix we know as the QR Code.
+Since the invention of the first QR code, it has become ubiquitous in various services.
+The widespread use of QR code is an undeniable reality. Therefore, I undertook this project
+to delve into the intricacies behind the black-and-white pixelated matrix we know as the QR code.
 ```
 
 
@@ -45,7 +45,7 @@ Therefore, the path constructed is processed into ```encoding``` as a list of ``
 ---
 <h3>Error Correction</h3>
 
-The QR Code uses Reed-Solomon error correction.<br/>
+The QR code uses Reed-Solomon error correction.<br/>
 Firstly, the data block information is obtained from `BlockDivision` in this format:<br/>
 &nbsp; `(b, n)`<br/>
 Where:
@@ -55,7 +55,7 @@ Where:
   ex: (5, 3) denotes that `block 1` repeats 5 times. It is then followed by `block 2` which repeats 3 times.
 
 
-Then, the data from `BitStream` is divided into the respective data blocks. If the amount of data codewords does not reach the maximum for the specific version and error correction level of the QR Code, `0xEC` and `0x11` are alternately padded at the end.
+Then, the data from `BitStream` is divided into the respective data blocks. If the amount of data codewords does not reach the maximum for the specific version and error correction level of the QR code, `0xEC` and `0x11` are alternately padded at the end.
 
 Afterwards, each data block is passed into the error correction engine. I will not go into the mathematics behind the error correction here.
 
@@ -65,7 +65,7 @@ $where\text{ }N_{i_{j}}\text{ }i\text{ is the data/error block }i\text{ and j is
 This sample also showcases how data blocks of different sizes are handled—namely $D_{2}\text{ and }D_{3}\text{ are both larger than }D_{1}$
 
 ---
-<h3>Generating the QR Code</h3>
+<h3>Generating the QR code</h3>
 
 This is done in the `QRCode` class.<br/>
 Firstly, the matrix is created and the following are added: the finder pattern, the timing pattern, and the alignment pattern.
@@ -78,7 +78,7 @@ Firstly, the matrix is created and the following are added: the finder pattern, 
 The function `is_occupied` in the `QRCode` class returns true if cell `(x, y)` is on any of the patterns above, including the area for version information and format information.
 
 #
-The next step is to copy the data on the QR Code matrix. This is done in a single while loop. The pattern is given as follows:
+The next step is to copy the data on the QR code matrix. This is done in a single while loop. The pattern is given as follows:
 <br/><br/>
 <p align="center">
   <img src="https://github.com/user-attachments/assets/8ce62f87-0f2b-48fe-8dd6-335349e2fc48" width="300" alt="image showing data matrix pattern."><br/>
@@ -89,7 +89,8 @@ The next step is to copy the data on the QR Code matrix. This is done in a singl
 
 #
 
-Afterwards, the qr code is masked using 8 mask patterns given by:
+Then, for each of the mask below, the respective version information and format information is added.
+Afterwards, the QR code is masked using 8 mask patterns given below:
 
 <div align="center">
   
@@ -109,6 +110,7 @@ Afterwards, the qr code is masked using 8 mask patterns given by:
   <img src="https://github.com/user-attachments/assets/03d51373-2cbf-4b7f-9b3d-1392825efbc2" width="300" alt="image showing masking and format info."><br/>
 </p>
 
+A 'bad' QR code may confuse scanners. Therefore, a penalty score is given to each of the 8 masked QR code.<br/>
 Given by these rules:
 | Rule | Description                                                                 | Penalty |
 |------|-----------------------------------------------------------------------------|---------|
@@ -117,7 +119,8 @@ Given by these rules:
 | 3    | Patterns that match the finder pattern (like 1:1:3:1:1 ratios)              | 40 * i where i is the number of said patterns |
 | 4    | Uneven distribution of dark and light modules (should be close to 50%)      | Let % of light modules be i. The penalty is $10\times2\times floor(\frac{50-i}{5})$ |
 
-The mask with the least penalty is chosen as the final QR Code.<br/>
+Finder patterns, quiet zone, and alignment patterns are not taken into account during the penalty check, given by the `is_reserved` function.<br/>
+The mask with the least penalty is chosen as the final QR code.<br/>
 The format information is subsequently added in this format:
 - 2 bits: Error Correction Level (L=01, M=00, Q=11, H=10)
 - 3 bits: Mask Pattern (0–7)
