@@ -1,6 +1,6 @@
 use image::{ImageBuffer, Rgba};
 
-use crate::generator::ecc::version_information_process;
+use super::ecc::version_information_process;
 
 use super::{
     data::{get_format_ecc, obtain_qr_alignment},
@@ -91,8 +91,7 @@ impl QRCode {
         };
 
         qr_code.generate_matrix();
-        let mask = qr_code.mask_matrix();
-        qr_code.add_format_symbols(mask);
+        qr_code.mask_matrix();
 
         return qr_code;
     }
@@ -151,10 +150,10 @@ impl QRCode {
         }
     }
 
-    fn add_format_symbols(&mut self, mask: u8) {
+    fn add_format_symbols(mat: &mut Vec<Vec<u8>>, ecc: u8, mask: u8, version: u8, size: usize) {
         let mut fmt = 0u16;
 
-        fmt |= (match self.ecc {
+        fmt |= (match ecc {
             0 => 0b01,
             1 => 0b00,
             2 => 0b11,
@@ -171,43 +170,43 @@ impl QRCode {
 
         //top left
         for y in 0..=5 {
-            self.set_bit(8, y, (fmt >> y) & 1 == 1);
+            Self::set_bit_mat(mat, 8, y, (fmt >> y) & 1 == 1);
         }
 
-        self.set_bit(8, 7, (fmt >> 6) & 1 == 1);
-        self.set_bit(8, 8, (fmt >> 7) & 1 == 1);
-        self.set_bit(7, 8, (fmt >> 8) & 1 == 1);
+        Self::set_bit_mat(mat, 8, 7, (fmt >> 6) & 1 == 1);
+        Self::set_bit_mat(mat, 8, 8, (fmt >> 7) & 1 == 1);
+        Self::set_bit_mat(mat, 7, 8, (fmt >> 8) & 1 == 1);
 
         for x in (0..=5).rev() {
-            self.set_bit(5 - x, 8, (fmt >> (9 + x)) & 1 == 1);
+            Self::set_bit_mat(mat, 5 - x, 8, (fmt >> (9 + x)) & 1 == 1);
         }
 
         //top right
         for x in 0..=7 {
-            self.set_bit(self.size - x - 1, 8, (fmt >> x) & 1 == 1);
+            Self::set_bit_mat(mat, size - x - 1, 8, (fmt >> x) & 1 == 1);
         }
 
         //bottom left
         for y in (0..=6).rev() {
-            self.set_bit(8, self.size - y - 1, (fmt >> (14 - y)) & 1 == 1);
+            Self::set_bit_mat(mat, 8, size - y - 1, (fmt >> (14 - y)) & 1 == 1);
         }
 
         //the single compulsory black module
-        self.set_bit(8, self.size - 8, true);
+        Self::set_bit_mat(mat, 8, size - 8, true);
 
         //version information
-        if self.version >= 7 {
-            let vers_info = version_information_process(self.version);
+        if version >= 7 {
+            let vers_info = version_information_process(version);
             
             let mut idx = 0;
-            let mut px = self.size - 11;
+            let mut px = size - 11;
             let mut py = 0;
             while idx < 18 {
-                self.set_bit(px, py, (vers_info >> idx) & 1 == 1);
-                self.set_bit(py, px, (vers_info >> idx) & 1 == 1);
+                Self::set_bit_mat(mat, px, py, (vers_info >> idx) & 1 == 1);
+                Self::set_bit_mat(mat, py, px, (vers_info >> idx) & 1 == 1);
                 px += 1;
-                if px == self.size - 8 {
-                    px = self.size - 11;
+                if px == size - 8 {
+                    px = size - 11;
                     py += 1;
                 }
                 idx += 1;
@@ -215,13 +214,44 @@ impl QRCode {
         }
     }
 
-    fn is_occupied(&self, x: usize, y: usize) -> bool {
+    //all the patterns except timing
+    fn is_reserved(&self, x: usize, y: usize) -> bool {
         if x >= self.size || y >= self.size {
             return true; //out of bounds
         }
 
+        //finders only
+        if x < 7 && y < 7 {
+            return true;
+        }
+
+        if x >= self.size - 7 && y < 7 {
+            return true;
+        }
+
+        if x < 7 && y >= self.size - 7 {
+            return true;
+        }
+
+        for (px, py) in &self.align_pat {
+            let px = *px as usize;
+            let py = *py as usize;
+            if (x >= px - 2 && x <= px + 2) && (y >= py - 2 && y <= py + 2) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    //is_reserved + format information
+    fn is_occupied_without_version(&self, x: usize, y: usize) -> bool {
         if y == 6 || x == 6 {
             return true; //timing
+        }
+
+        if self.is_reserved(x, y) {
+            return true;
         }
 
         //finder & format
@@ -237,20 +267,21 @@ impl QRCode {
             return true;
         }
 
+        false
+    }
+
+    //is_occupied but with version
+    fn is_occupied(&self, x: usize, y: usize) -> bool {
+        if self.is_occupied_without_version(x, y) {
+            return true;
+        }
+
         if self.version >= 7 {
             if y < 6 && x >= self.size - 11 {
                 return true;
             }
 
             if x < 6 && y >= self.size - 11 {
-                return true;
-            }
-        }
-
-        for (px, py) in &self.align_pat {
-            let px = *px as usize;
-            let py = *py as usize;
-            if (x >= px - 2 && x <= px + 2) && (y >= py - 2 && y <= py + 2) {
                 return true;
             }
         }
@@ -360,18 +391,20 @@ impl QRCode {
         let mut blacks = 0;
         let mut whites = 0;
 
-        let mut rule1_white = false;
-        let mut rule1_count = 0isize;
-
         let mut y = 0;
         for yidx in 0..mat.len() {
             let mut x = 0;
             for xidx in 0..mat[yidx].len() {
                 for i in (0..8).rev() {
                     if self.is_occupied(x, y) {
+                        //part of rule 4
+                        if mat[yidx][xidx] & (1 << i) == 0 {
+                            whites += 1;
+                        } else {
+                            blacks += 1;
+                        }
+
                         x += 1;
-                        penalty += (rule1_count - 5).max(0) as usize;
-                        rule1_count = 0;
                         continue;
                     }
 
@@ -380,26 +413,10 @@ impl QRCode {
                         mat[yidx][xidx] = byte ^ (1 << i);
                     }
 
-                    //rule 1 horizontal and part of rule 4
+                    //part of rule 4
                     if mat[yidx][xidx] & (1 << i) == 0 {
-                        //white
-                        if !rule1_white {
-                            penalty += (rule1_count - 5).max(0) as usize;
-                            rule1_white = true;
-                            rule1_count = 0;
-                        }
-                        rule1_count += 1;
-
                         whites += 1;
                     } else {
-                        //black
-                        if rule1_white {
-                            penalty += (rule1_count - 5).max(0) as usize;
-                            rule1_white = false;
-                            rule1_count = 0;
-                        }
-                        rule1_count += 1;
-
                         blacks += 1;
                     }
 
@@ -414,48 +431,74 @@ impl QRCode {
                 }
             }
             y += 1;
-
-            penalty += (rule1_count - 5).max(0) as usize;
-            rule1_count = 0;
         }
 
+        let mut rule1_color = false;
+        let mut rule1_penalty = 0;
+        let mut rule1_count = 0isize;
         let mut rule2_count = 0;
-
-        //rule 1 vertical and rule 2
-        rule1_white = false;
-        rule1_count = 0;
-        for x in 0..self.size {
-            for y in 0..self.size {
-                if self.is_occupied(x, y) {
+        
+        //rule 1 horizontal
+        for y in 0..self.size {
+            for x in 0..self.size {
+                if self.is_reserved(x, y) {
                     penalty += (rule1_count - 5).max(0) as usize;
+                    if rule1_count >= 5 {
+                        rule1_penalty += 1;
+                    }
                     rule1_count = 0;
                     continue;
                 }
 
                 let cell = Self::get_val_mat(mat, x, y);
-                if cell {
-                    //black
-                    if rule1_white {
-                        penalty += (rule1_count - 5).max(0) as usize;
-                        rule1_white = false;
-                        rule1_count = 0;
+                if rule1_color != cell {
+                    penalty += (rule1_count - 5).max(0) as usize;
+                    if rule1_count >= 5 {
+                        rule1_penalty += 1;
                     }
-                    rule1_count += 1;
+                    rule1_color = cell;
+                    rule1_count = 1;
                 } else {
-                    //white
-                    if !rule1_white {
-                        penalty += (rule1_count - 5).max(0) as usize;
-                        rule1_white = true;
-                        rule1_count = 0;
+                    rule1_count += 1;
+                }
+            }
+
+            penalty += (rule1_count - 5).max(0) as usize;
+            if rule1_count >= 5 {
+                rule1_penalty += 1;
+            }
+            rule1_count = 0;
+        }
+
+        //rule 1 vertical and rule 2
+        rule1_color = false;
+        rule1_count = 0;
+        for x in 0..self.size {
+            for y in 0..self.size {
+                if self.is_reserved(x, y) {
+                    penalty += (rule1_count - 5).max(0) as usize;
+                    if rule1_count >= 5 {
+                        rule1_penalty += 1;
                     }
+                    rule1_count = 0;
+                    continue;
+                }
+
+                let cell = Self::get_val_mat(mat, x, y);
+                if rule1_color != cell {
+                    penalty += (rule1_count - 5).max(0) as usize;
+                    if rule1_count >= 5 {
+                        rule1_penalty += 1;
+                    }
+                    rule1_color = cell;
+                    rule1_count = 1;
+                } else {
                     rule1_count += 1;
                 }
 
-                if !self.is_occupied(x + 1, y) && Self::get_val_mat(mat, x + 1, y) == cell {
-                    if !self.is_occupied(x, y + 1) && Self::get_val_mat(mat, x, y + 1) == cell {
-                        if !self.is_occupied(x + 1, y + 1)
-                            && Self::get_val_mat(mat, x + 1, y + 1) == cell
-                        {
+                if x + 1 < self.size && Self::get_val_mat(mat, x + 1, y) == cell {
+                    if y + 1 < self.size && Self::get_val_mat(mat, x, y + 1) == cell {
+                        if Self::get_val_mat(mat, x + 1, y + 1) == cell {
                             rule2_count += 1;
                         }
                     }
@@ -463,12 +506,18 @@ impl QRCode {
             }
 
             penalty += (rule1_count - 5).max(0) as usize;
+            if rule1_count >= 5 {
+                rule1_penalty += 1;
+            }
             rule1_count = 0;
         }
 
+        // rule 1 addition
+        penalty += 3 * rule1_penalty;
+        
         // rule 2
         penalty += 3 * rule2_count;
-
+        
         // rule 4
         penalty += (10.0 * ((0.5 - blacks as f32 / (blacks + whites) as f32).abs() / 0.05).floor())
             as usize;
@@ -481,11 +530,10 @@ impl QRCode {
 
         while py < self.size {
             // horizontal scan
-            while px <= self.size - 7 {
-                //need space for the 7 modules
+            while px <= self.size - 7 { //need space for the 7 modules
                 let mut failed = false;
                 for x in 0..7 {
-                    if self.is_occupied(px + x, py) {
+                    if self.is_reserved(px + x, py) {
                         px += x;
                         failed = true;
                         break;
@@ -498,7 +546,7 @@ impl QRCode {
                 }
 
                 if Self::get_range_x_mat(mat, px, px + 7, py) == rule3_seq {
-                    if px - 4 >= 7 && !Self::get_range_x_mat(mat, px - 4, px, py).contains(&true) {
+                    if px as isize - 4 >= 7 && !Self::get_range_x_mat(mat, px - 4, px, py).contains(&true) {
                         rule3_count += 1;
                         px += 7;
                     } else if px + 10 < self.size
@@ -522,12 +570,11 @@ impl QRCode {
         py = 0;
         while px < self.size {
             // vertical scan
-            while py <= self.size - 7 {
-                //need space for the 7 modules
+            while py <= self.size - 7 { //need space for the 7 modules
                 let mut failed = false;
                 for y in 0..7 {
-                    if self.is_occupied(px, py + y) {
-                        py += y;
+                    if self.is_reserved(px, py + y) {
+                        px += y;
                         failed = true;
                         break;
                     }
@@ -539,7 +586,7 @@ impl QRCode {
                 }
 
                 if Self::get_range_y_mat(mat, px, py, py + 7) == rule3_seq {
-                    if py - 4 >= 7 && !Self::get_range_y_mat(mat, px, py - 4, py).contains(&true) {
+                    if (py as isize) - 4 >= 7 && !Self::get_range_y_mat(mat, px, py - 4, py).contains(&true) {
                         rule3_count += 1;
                         py += 7;
                     } else if py + 10 < self.size
@@ -561,30 +608,34 @@ impl QRCode {
 
         penalty += 40 * rule3_count;
 
+        //println!("{penalty} {rule3_count} ---------------");
+        if mask == mask0 {
+            penalty = 0;
+        }
+
         penalty
     }
 
-    fn mask_matrix(&mut self) -> u8 {
+    fn mask_matrix(&mut self) {
         let masks = [mask0, mask1, mask2, mask3, mask4, mask5, mask6, mask7];
         let mut min_err = 1e8 as usize;
         let mut mat_best = None;
         let mut mask_idx = 0;
-        let mut mask = 0;
 
         for func in masks {
             let mut mat = self.mat.clone();
+            
+            Self::add_format_symbols(&mut mat, self.ecc, mask_idx, self.version, self.size);
+
             let err = self.perform_mask(&mut mat, func);
             if err < min_err {
                 min_err = err;
                 mat_best = Some(mat);
-                mask = mask_idx;
             }
             mask_idx += 1;
         }
 
         self.mat = mat_best.unwrap();
-
-        return mask;
     }
 
     pub fn gen_image(&self, pixel: u32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {

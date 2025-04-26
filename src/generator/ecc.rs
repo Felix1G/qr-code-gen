@@ -40,12 +40,12 @@ fn poly_mul(a: &[u8], b: &[u8], field: &GaloisField) -> Vec<u8> {
     for i in 0..result.len() {
         let mut coeff = 0;
         for aidx in 0..a.len() {
-            let bidx = i - aidx;
-            if bidx >= b.len() {
+            let bidx = i as isize - aidx as isize;
+            if bidx >= b.len() as isize || bidx < 0 {
                 continue;
             }
 
-            coeff ^= field.mul(a[aidx], b[bidx]);
+            coeff ^= field.mul(a[aidx], b[bidx as usize]);
         }
         result[i] = coeff;
     }

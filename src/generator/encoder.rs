@@ -154,7 +154,7 @@ impl Encoder for BytesEncoder {
         let len = str.len();
         let mut str_iter = str.chars();
 
-        if version <= 10 {
+        if version <= 9 {
             bytes.push(len as u8);
         } else {
             bytes.push((len >> 8) as u8);

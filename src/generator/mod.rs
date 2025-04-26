@@ -386,8 +386,28 @@ impl Generator {
         for (err_len, code_vec) in &data_codewords {
             error_codewords.push(err.calculate(code_vec, *err_len));
         }
+
+        // for (_, vec) in &data_codewords {
+        //     println!("{} | ", vec.len());
+        //     for dat in vec {
+        //         print!("{} ", dat);
+        //     }
+        //     println!();
+        // }
+        // println!("----------------------");
+        // for vec in &error_codewords {
+        //     println!("{} |", vec.len());
+        //     for dat in vec {
+        //         print!("{} ", dat);
+        //     }
+        //     println!();
+        // }
+        // println!("----------------------");
         
         let qr_code_data = Self::combine_data_err(data_codewords, error_codewords);
+        // for dat in &qr_code_data {
+        //       print!("{:08b} ", dat);
+        // }
         // println!("{}", qr_code_data.len());
         let qr_code = QRCode::new(qr_code_data, version, &self.flag.ecc);
         qr_code.gen_image(self.size).save(&self.output).unwrap();
