@@ -1,3 +1,5 @@
+use std::process::exit;
+
 use encoding_rs::SHIFT_JIS;
 
 use super::bitstream::BitStream;
@@ -33,16 +35,18 @@ impl Encoder for NumeralEncoder {
             for _ in s..e {
                 text_parse.push(text.next().unwrap_or('\0'));
             }
-
             match text_parse.parse::<usize>() {
-                Ok(x) => match e - s {
-                    1 => bytes.push_bits_big(x, 4),
-                    2 => bytes.push_bits_big(x, 7),
-                    3 => bytes.push_bits_big(x, 10),
-                    _ => {}
+                Ok(x) => {
+                    match e - s {
+                        1 => bytes.push_bits(x as u8, 4),
+                        2 => bytes.push_bits(x as u8, 7),
+                        3 => bytes.push_bits_big(x, 10),
+                        _ => {}
+                    }
                 },
                 Err(e) => {
-                    panic!("Error while parsing text numeral. {e}");
+                    eprintln!("Error while parsing text numeral. {e}");
+                    exit(0);
                 }
             }
 
@@ -58,7 +62,21 @@ pub fn is_kanji(ch: char) -> bool {
     // Encode the char as SHIFT_JIS.  If encoding succeeds without error, it's encodable.
     let (encoded, _, err) = SHIFT_JIS.encode(&char_str);
 
-    !err && !encoded.is_empty()
+    if !err && encoded.len() > 1 {
+        let mut encoded_iter = encoded.iter();
+        let b1 = *encoded_iter.next().unwrap();
+        let b2 = *encoded_iter.next().unwrap();
+        let val = ((b1 as usize) << 8) | b2 as usize;
+        if val >= 0x8140 && val <= 0x9FFC {
+            return true;
+        } else if val >= 0xE040 && val <= 0xEBBF {
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        false
+    }
 }
 
 pub const fn alphanum_value(c: char) -> Option<u8> {
@@ -192,7 +210,8 @@ impl Encoder for KanjiEncoder {
         let (encoded, _, error) = SHIFT_JIS.encode(&str);
 
         if error {
-            panic!("Error: cannot encode kanji.");
+            eprintln!("Error: cannot encode kanji.");
+            exit(0);
         }
 
         let mut encoded_iter = encoded.iter();

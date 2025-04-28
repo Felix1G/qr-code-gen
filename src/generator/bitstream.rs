@@ -1,3 +1,5 @@
+use std::process::exit;
+
 pub struct BitStream {
     bytes: Vec<u8>,
     offset: u8,
@@ -22,11 +24,22 @@ impl BitStream {
         }
     }
 
+    pub fn size(&self) -> usize {
+        if self.offset == 0 {
+            8 * self.bytes.len()
+        } else if self.bytes.len() == 1 {
+            self.offset as usize
+        } else {
+            8 * (self.bytes.len() - 1) + self.offset as usize
+        }
+    }
+
     /// @param number number to push
     /// @param size number of bits to push
     pub fn push_bits(&mut self, number: u8, size: u8) {
         if size > 8 {
-            panic!("BitStream: push_bits size, {size} > 8.");
+            eprintln!("BitStream: push_bits size, {size} > 8.");
+            exit(0);
         }
 
         let num = number & (0xFF >> (8 - size));

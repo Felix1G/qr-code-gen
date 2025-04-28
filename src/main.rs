@@ -1,21 +1,27 @@
 mod generator;
+mod scanner;
 use std::process::exit;
 
+use scanner::Scanner;
 use generator::{ECCLevel, Flag, Generator};
 
 fn usage_str() -> String {
     String::from("
 Usage: qr-gen [OPTIONS (optional)] <text OR data file path> [generated-image-path (default: qr_code.png)] [pixel size (default: 5)]
-Options:
-	-f: data file path is provided | (default is false)
+Scanner Options:
+    -s: switch mode to scanning the QR Code (format: qr-gen [OPTIONS] <qr code image file path> [generated-parsed-data-path (default: parsed.txt)])
+
+Generator Options:
+    -f: data file path is provided | (default is false)
 	-b: convert data to bytes, encoding types (eci headers) will not be considered | (default is false)
 	-v[number]: minimum version of QR code being version 'number' from 1 to 40. (eg: -v3) | (default is 1)
 	-e[number]: error correction, takes up about ~x% space. 0 = low (~7%), 1 = medium (~15%), 2 = quartile (~25%), 3 = high (~30%) | (default is quartile)
 ")
 }
 
-fn set_options(op: &String, flag: &mut Flag) {
+fn set_options(op: &String, flag: &mut Flag, scan: &mut bool) {
     match op.as_str() {
+        "-s" => *scan = true,
         "-f" => flag.data = true,
         "-b" => flag.bytes = true,
         _ => {
@@ -90,9 +96,10 @@ fn main() {
         } else {
             let mut idx = 1;
             let mut flag = Flag::new();
+            let mut scan = false;
 
             while args[idx].starts_with("-") {
-                set_options(&args[idx], &mut flag);
+                set_options(&args[idx], &mut flag, &mut scan);
                 idx += 1;
             }
 
@@ -100,7 +107,11 @@ fn main() {
             let path = if args.len() > idx + 1 {
                 args[idx + 1].clone()
             } else {
-                String::from("qr_code.png")
+                if scan {
+                    String::from("parsed.txt")
+                } else {
+                    String::from("qr_code.png")
+                }
             };
             let size = if args.len() > idx + 2 {
                 match args[idx + 2].parse::<u32>() {
@@ -117,14 +128,20 @@ fn main() {
                 5
             };
 
-            if !(path.ends_with(".png") || path.ends_with(".jpg") || path.ends_with(".jpeg")) {
-                panic!("Error: unsupported file extension for output path. ({})", path);
+            if !scan && (!(path.ends_with(".png") || path.ends_with(".jpg") || path.ends_with(".jpeg"))) {
+                eprintln!("Error: unsupported file extension for output path. ({})", path);
+                exit(0);
             }
 
             //println!("{} {} {} {} {} {}", text, path, size, flag.data, flag.bytes, flag.min_vers);
 
-            let gen = Generator::new(text, path, size, flag);
-            gen.run();
+            if scan {
+                let scan = Scanner::new(text, path);
+                scan.scan();
+            } else {
+                let gen = Generator::new(text, path, size, flag);
+                gen.run();
+            }
         }
     } else {
         println!("use -h to see help.");

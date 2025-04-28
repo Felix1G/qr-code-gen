@@ -144,6 +144,17 @@ impl BlockDivision {
     }
 }
 
+pub fn qr_capacity_query(ecc: &ECCLevel, version: u8) -> usize {
+    let idx = match ecc {
+        ECCLevel::Low => 0,
+        ECCLevel::Medium => 1,
+        ECCLevel::Quartile => 2,
+        ECCLevel::High => 3
+    };
+
+    return MAX_SIZE_DATA[idx][(version - 1) as usize];
+}
+
 pub fn qr_version_query(ecc: &ECCLevel, size: usize) -> u8 {
     let idx = match ecc {
         ECCLevel::Low => 0,
